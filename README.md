@@ -1,1 +1,4 @@
-# permutation-t-test-type-I-error-rates
+# Test of permutation t test type I error rates through simulation
+This paper examines, through simulations, how well a two-sample permutation t test (also called a randomization t test) approximates the desired Type I error specified in the test. The permutation t test uses the same t statistic as the independent-sample t test, but obtains a p value from the permutation distribution of the t statistic, instead of using the theoretical distribution derived from the parametric assumption. Two advantages of this approach are: 1) it is likely to be more robust than the independent-sample t test in situations where the assumption of normality is violated, and 2) unlike a traditional permutation test, it can employ a Welch t test, which allows for variances to be unequal. A separate report shows that type I error rates for the traditional permutation test are not sufficiently robust when both sample sizes and variances differ.
+
+The results for equal and unequal sample sizes and equal and unequal variances are examined, both for normal and skewed distributions.
