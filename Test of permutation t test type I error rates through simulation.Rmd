@@ -28,7 +28,7 @@ Let's examine 24 different several sampling scenarios. We'll first use the stand
 
 In each of these scenarios both samples have the same mean, so we're essentially assuming that the two samples come from a population with a mean of zero; thus we're examining the null distribution for a population with a mean of zero. This means that when we run a t test on these samples and set the desired alpha to 0.05, just by chance about 5% of the p values should fall below 0.05. These are type I errors.
 
-We'll set the number of simulations to 1000 for each comparison, but this can be changed in the code below. Because the randomization test itself uses many permutations, the code can take a long time to run if simulations are set higher. With 1000 simulations and 1000 permutations for each randomization test, the code below takes about 27 minutes to run.
+We'll set the number of simulations to 1000 for each comparison, but this can be changed in the code below. Because the permutation test itself uses many permutations, the code can take a long time to run if simulations are set higher. With 1000 simulations and 1000 permutations for each permutation t test, the code below takes about 48 minutes to run.
 
 Note that I am not setting a random number seed for these simulations, so if you run the simulations you will get somewhat different results.
 
@@ -75,7 +75,7 @@ alpha.p = 0.05
 
 ### Permutation t tests on samples from normal populations
 
-Create a data frame with combinations of sample sizes and standard deviations for the two samples, n1 and n2. Standard deviations for each sample are specified in columns s1 and s2. Add columns p.var.equal and p.var.unequal and fill with NA. The mean type I error values for these columns will be filled in by the for loop below.
+Create a data frame with combinations of sample sizes and standard deviations for the two samples, n1 and n2. Standard deviations for each sample are specified in columns s1 and s2. Add columns p.var.equal and p.var.unequal and fill with NA. The mean type I error values for these columns will be filled in by the pmap_dbl() function below.
 
 ```{r}
 combos = data.frame(n1 = c(10, 10, 10, 10, 20, 10, 20, 30,
@@ -98,24 +98,35 @@ combos = data.frame(n1 = c(10, 10, 10, 10, 20, 10, 20, 30,
 combos2 = combos  # Create a second combos df for later analysis on skewed data.              
 ```
 
-The for loop below takes the sample sizes and standard deviations in each row of the combos data frame created above, draws two random samples from the same populations, performs a randomization test on each pair of samples and records the p value for the test. It does this the number of times specified in nreps above, and returns the mean proportion of times the p values fell below the alpha level specified (0.05 as entered above). This is the empirical type I error rate for each of the 24 sampling scenarios.
+The pmap_dbl() function below takes the sample sizes and standard deviations in each row of the combos data frame created above, draws two random samples from the same populations, performs a permutation t test on each pair of samples and records the p value for the test. It does this the number of times specified in nreps above, and returns the mean proportion of times the p values fell below the alpha level specified (0.05 as entered above). This is the empirical type I error rate for each of the 24 sampling scenarios.
 
-Note that this takes some time to run. The default number of permutations for the perm.t.test() function is 9999 permutations (9999 + the original sample = 10000). I've changed this to 999 given that we are running each of the 24 scenarios and each scenario requires 1000 simulations. Running more simulations than specified in nreps above and more permutations per test would yield more precise estimates of type I error, but will take considerable time to process. The combination of 1000 simulations and 999 permutations per test takes about 22.2 minutes to run. Because we are doing two for loops, one for the normal distribution and one for the skewed normal distribution, this means the entire script takes about 45 minutes to run.
 
 ```{r}
 
-for(i in 1:nrow(combos)) {
+combos$p.var.equal = pmap_dbl(
+   .l = list(combos$n1,
+    combos$n2,
+    combos$s1,
+    combos$s2),
+   \(n1, n2, s1, s2) mean(replicate(nreps, 
+                       perm.t.test(rnorm(n1, mean = 0, sd = s1), 
+                       rnorm(n2, mean = 0, sd = s2), alternative = "two.sided",
+                       R = 999, var.equal = TRUE)$p.value) < 0.05)
+)
 
-type.1.err.var.equal = mean(replicate(nreps, 
-        perm.t.test(rnorm(combos$n1[i], mean = 0, sd = combos$s1[i]), rnorm(combos$n2[i], mean = 0, sd = combos$s2[i]), alternative = "two.sided", R = 999, var.equal = TRUE)$p.value) < 0.05)
+combos$p.var.unequal = pmap_dbl(
+   .l = list(combos$n1,
+    combos$n2,
+    combos$s1,
+    combos$s2),
+   \(n1, n2, s1, s2) mean(replicate(nreps, 
+                       perm.t.test(rnorm(n1, mean = 0, sd = s1), 
+                       rnorm(n2, mean = 0, sd = s2), alternative = "two.sided",
+                       R = 999, var.equal = FALSE)$p.value) < 0.05)
+)
 
-type.1.err.var.unequal = mean(replicate(nreps, 
-        perm.t.test(rnorm(combos$n1[i], mean = 0, sd = combos$s1[i]), rnorm(combos$n2[i], mean = 0, sd = combos$s2[i]), alternative = "two.sided", R = 999, var.equal = FALSE)$p.value) < 0.05)
 
-combos[i, 5] = type.1.err.var.equal
-combos[i, 6] = type.1.err.var.unequal
 
-}
 
 ```
 
@@ -145,22 +156,33 @@ hist(skew1)
 hist(skew2)
 ```
 
-The combination of 1000 simulations and 1000 permutations per test in the for loop below takes about 22 minutes to run.
+Run the simulations using the skewed normal distribution and put the results in the combos2 dataframe we created above.
 
 ```{r}
 
-for(i in 1:nrow(combos2)) {
-
-type.1.err.var.equal = mean(replicate(nreps, 
-        perm.t.test(rsnorm(combos2$n1[i], mean = 0, sd = combos2$s1[i]), rnorm(combos2$n2[i], mean = 0, sd = combos2$s2[i]), alternative = "two.sided", R = 999, var.equal = TRUE)$p.value) < 0.05)  
-
-type.1.err.var.unequal = mean(replicate(nreps, 
-        perm.t.test(rsnorm(combos2$n1[i], mean = 0, sd = combos2$s1[i]), rnorm(combos2$n2[i], mean = 0, sd = combos2$s2[i]), alternative = "two.sided", R = 999, var.equal = FALSE)$p.value) < 0.05)  
-
-combos2[i, 5] = type.1.err.var.equal
-combos2[i, 6] = type.1.err.var.unequal
+combos2$p.var.equal = pmap_dbl(
+    .l = list(combos$n1,
+              combos$n2,
+              combos$s1,
+              combos$s2),
+    \(n1, n2, s1, s2) mean(replicate(nreps, 
+                         perm.t.test(rsnorm(n1, mean = 0, sd = s1, xi = 3), 
+                         rsnorm(n2, mean = 0, sd = s2, xi = 3), 
+                         alternative = "two.sided", R = 999, 
+                         var.equal = TRUE)$p.value) < 0.05)
+)
   
-}
+combos2$p.var.unequal = pmap_dbl(
+    .l = list(combos$n1,
+              combos$n2,
+              combos$s1,
+              combos$s2),
+    \(n1, n2, s1, s2) mean(replicate(nreps, 
+                         perm.t.test(rsnorm(n1, mean = 0, sd = s1, xi = 3), 
+                         rsnorm(n2, mean = 0, sd = s2, xi = 3), 
+                         alternative = "two.sided", R = 999, 
+                         var.equal = FALSE)$p.value) < 0.05)
+)
 ```
 
 Put the results in a table.
